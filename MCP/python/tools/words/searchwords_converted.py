@@ -1,0 +1,93 @@
+"""
+MCP tool for Searches words
+"""
+
+import json
+import requests
+from typing import Dict, Any, Optional
+
+
+def get_words_json_search_query(allowRegex: str, query: str, caseSensitive: str, includePartOfSpeech: str, excludePartOfSpeech: str, minCorpusCount: str, maxCorpusCount: str, minDictionaryCount: str, maxDictionaryCount: str, minLength: str, maxLength: str, skip: str, limit: str) -> str:
+    """
+    Searches words
+    """
+    try:
+        # Get configuration
+        config = get_config()
+        
+        if not config.base_url or not config.bearer_token:
+            return "Error: Missing API configuration. Please set API_BASE_URL and API_BEARER_TOKEN environment variables."
+        
+        # Build request parameters
+        params = {}
+        if allowRegex: params["allowRegex"] = allowRegex
+        if query: params["query"] = query
+        if caseSensitive: params["caseSensitive"] = caseSensitive
+        if includePartOfSpeech: params["includePartOfSpeech"] = includePartOfSpeech
+        if excludePartOfSpeech: params["excludePartOfSpeech"] = excludePartOfSpeech
+        if minCorpusCount: params["minCorpusCount"] = minCorpusCount
+        if maxCorpusCount: params["maxCorpusCount"] = maxCorpusCount
+        if minDictionaryCount: params["minDictionaryCount"] = minDictionaryCount
+        if maxDictionaryCount: params["maxDictionaryCount"] = maxDictionaryCount
+        if minLength: params["minLength"] = minLength
+        if maxLength: params["maxLength"] = maxLength
+        if skip: params["skip"] = skip
+        if limit: params["limit"] = limit
+        
+        # Make API call
+        url = f"{config.base_url}/api/unknown"
+        
+        headers = {
+            "Authorization": f"Bearer {config.bearer_token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.get(url, headers=headers, params=params)
+        
+        # Handle HTTP errors
+        if response.status_code >= 400:
+            try:
+                error_data = response.json()
+                return f"Failed to format JSON: {json.dumps(error_data, indent=2)}"
+            except json.JSONDecodeError:
+                return f"Failed to format JSON: {response.text}"
+        
+        # Parse response
+        try:
+            result = response.json()
+            return json.dumps(result, indent=2)
+        except json.JSONDecodeError:
+            # Fallback to raw text if JSON parsing fails
+            return response.text
+            
+    except requests.exceptions.ConnectionError as e:
+        return f"Request failed: Connection error - {str(e)}"
+    except requests.exceptions.Timeout as e:
+        return f"Request failed: Request timeout - {str(e)}"
+    except requests.exceptions.RequestException as e:
+        return f"Request failed: {str(e)}"
+    except Exception as e:
+        return f"Unexpected error: {str(e)}"
+
+
+def get_config():
+    """Get configuration from environment or config file."""
+    import os
+    from pathlib import Path
+    
+    class Config:
+        def __init__(self):
+            self.base_url = os.getenv("API_BASE_URL")
+            self.bearer_token = os.getenv("API_BEARER_TOKEN")
+            
+            # Try to load from config file if env vars not set
+            if not self.base_url or not self.bearer_token:
+                config_path = Path.home() / ".api" / "config.json"
+                if config_path.exists():
+                    with open(config_path, 'r') as f:
+                        config_data = json.load(f)
+                        self.base_url = self.base_url or config_data.get("baseURL")
+                        self.bearer_token = self.bearer_token or config_data.get("bearerToken")
+    
+    return Config()
